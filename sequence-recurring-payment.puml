@@ -1,0 +1,26 @@
+@startuml
+participant Scheduler
+participant SubPay
+database DB
+participant PSP
+Scheduler -> SubPay: process due subscriptions
+SubPay -> DB: select ACTIVE due subscription
+SubPay -> DB: insert Payment (unique period)
+SubPay -> DB: insert Attempt #1 + provider idempotency key
+SubPay -> PSP: POST payment
+alt PSP returns PENDING
+  PSP --> SubPay: provider_payment_id, PENDING
+  SubPay -> DB: Payment PROCESSING / Attempt PENDING
+  PSP -> SubPay: webhook payment.succeeded + signature
+  SubPay -> SubPay: verify signature
+  SubPay -> DB: insert provider_event_id if new
+  SubPay -> DB: Attempt SUCCEEDED; Payment SUCCEEDED; advance next_charge_at
+  SubPay --> PSP: 204
+else temporary failure
+  PSP --> SubPay: FAILED / TEMPORARY
+  SubPay -> DB: schedule next_retry_at (+24h)
+else permanent failure
+  PSP --> SubPay: FAILED / PERMANENT
+  SubPay -> DB: Payment FAILED; Subscription PAST_DUE
+end
+@enduml

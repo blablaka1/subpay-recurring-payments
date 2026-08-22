@@ -1,0 +1,9 @@
+@startuml
+[*] --> CREATED
+CREATED --> PROCESSING : first attempt created
+PROCESSING --> SUCCEEDED : confirmed by PSP
+PROCESSING --> PROCESSING : temporary failure + retry remains
+PROCESSING --> FAILED : permanent failure / attempts exhausted
+SUCCEEDED --> [*]
+FAILED --> [*]
+@enduml

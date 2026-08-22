@@ -1,0 +1,192 @@
+openapi: 3.1.0
+info:
+  title: SubPay Merchant API
+  version: 1.0.0
+  description: Учебный API регулярных платежей.
+servers:
+  - url: https://api.subpay.example.test/api/v1
+security:
+  - bearerAuth: []
+paths:
+  /customers/{customerId}/payment-methods:
+    post:
+      summary: Зарегистрировать токен платёжного метода
+      parameters:
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePaymentMethodRequest' }
+      responses:
+        '201':
+          description: Платёжный метод сохранён
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentMethod' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /subscriptions:
+    post:
+      summary: Создать подписку
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string, minLength: 8, maxLength: 100 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSubscriptionRequest' }
+      responses:
+        '201':
+          description: Подписка создана
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /subscriptions/{subscriptionId}:
+    get:
+      summary: Получить подписку
+      parameters:
+        - $ref: '#/components/parameters/SubscriptionId'
+      responses:
+        '200':
+          description: Подписка
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /subscriptions/{subscriptionId}/pause:
+    post:
+      summary: Поставить подписку на паузу
+      parameters:
+        - $ref: '#/components/parameters/SubscriptionId'
+      responses:
+        '200':
+          description: Подписка
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+  /subscriptions/{subscriptionId}/resume:
+    post:
+      summary: Возобновить подписку
+      parameters:
+        - $ref: '#/components/parameters/SubscriptionId'
+      responses:
+        '200':
+          description: Подписка
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+  /subscriptions/{subscriptionId}/cancel:
+    post:
+      summary: Отменить подписку
+      parameters:
+        - $ref: '#/components/parameters/SubscriptionId'
+      responses:
+        '200':
+          description: Подписка
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+  /subscriptions/{subscriptionId}/payments:
+    get:
+      summary: Получить платежи подписки
+      parameters:
+        - $ref: '#/components/parameters/SubscriptionId'
+      responses:
+        '200':
+          description: Платежи
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Payment' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    SubscriptionId:
+      in: path
+      name: subscriptionId
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    CreatePaymentMethodRequest:
+      type: object
+      additionalProperties: false
+      required: [provider_token]
+      properties:
+        provider_token: { type: string, minLength: 8, maxLength: 255, description: 'Токен PSP; не PAN/CVV.' }
+    PaymentMethod:
+      type: object
+      required: [payment_method_id, status]
+      properties:
+        payment_method_id: { type: string, format: uuid }
+        status: { type: string, enum: [ACTIVE, DISABLED] }
+        masked_label: { type: [string, 'null'], example: 'Visa •••• 4242' }
+    CreateSubscriptionRequest:
+      type: object
+      additionalProperties: false
+      required: [customer_id, payment_method_id, amount_minor, currency, interval]
+      properties:
+        customer_id: { type: string, format: uuid }
+        payment_method_id: { type: string, format: uuid }
+        amount_minor: { type: integer, format: int64, minimum: 10000, maximum: 10000000 }
+        currency: { type: string, enum: [RUB] }
+        interval: { type: string, enum: [MONTHLY] }
+        first_charge_at: { type: [string, 'null'], format: date-time }
+    Subscription:
+      type: object
+      required: [subscription_id, customer_id, amount_minor, currency, interval, status, next_charge_at]
+      properties:
+        subscription_id: { type: string, format: uuid }
+        customer_id: { type: string, format: uuid }
+        amount_minor: { type: integer, format: int64 }
+        currency: { type: string, enum: [RUB] }
+        interval: { type: string, enum: [MONTHLY] }
+        status: { type: string, enum: [ACTIVE, PAUSED, PAST_DUE, CANCELED] }
+        next_charge_at: { type: [string, 'null'], format: date-time }
+    Payment:
+      type: object
+      required: [payment_id, subscription_id, amount_minor, currency, status, billing_period_start]
+      properties:
+        payment_id: { type: string, format: uuid }
+        subscription_id: { type: string, format: uuid }
+        amount_minor: { type: integer, format: int64 }
+        currency: { type: string, enum: [RUB] }
+        status: { type: string, enum: [CREATED, PROCESSING, SUCCEEDED, FAILED] }
+        billing_period_start: { type: string, format: date }
+        next_retry_at: { type: [string, 'null'], format: date-time }
+    Problem:
+      type: object
+      required: [type, title, status, code, request_id]
+      properties:
+        type: { type: string, format: uri-reference }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code: { type: string }
+        request_id: { type: string }
+  responses:
+    BadRequest:
+      description: Невалидный запрос
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: Конфликт состояния или идемпотентности
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }

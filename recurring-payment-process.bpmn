@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" targetNamespace="http://example.test/subpay">
+  <process id="Process_RecurringPayment" name="Регулярное списание" isExecutable="false">
+    <startEvent id="Start" name="Наступил next_charge_at"/>
+    <task id="CreatePayment" name="Создать Payment для периода"/>
+    <task id="CreateAttempt" name="Создать Attempt"/>
+    <task id="SendPSP" name="Отправить платёж в PSP"/>
+    <intermediateCatchEvent id="WaitResult" name="Получить ответ/webhook"/>
+    <exclusiveGateway id="Result" name="Результат?"/>
+    <task id="Success" name="Payment SUCCEEDED; перенести next_charge_at"/>
+    <exclusiveGateway id="Retry" name="Ошибка временная и attempts &lt; 3?"/>
+    <task id="ScheduleRetry" name="Назначить retry +24h"/>
+    <task id="Failed" name="Payment FAILED; Subscription PAST_DUE"/>
+    <endEvent id="EndSuccess" name="Успех"/>
+    <endEvent id="EndPending" name="Ожидание retry"/>
+    <endEvent id="EndFailed" name="Неуспех"/>
+    <sequenceFlow id="f1" sourceRef="Start" targetRef="CreatePayment"/>
+    <sequenceFlow id="f2" sourceRef="CreatePayment" targetRef="CreateAttempt"/>
+    <sequenceFlow id="f3" sourceRef="CreateAttempt" targetRef="SendPSP"/>
+    <sequenceFlow id="f4" sourceRef="SendPSP" targetRef="WaitResult"/>
+    <sequenceFlow id="f5" sourceRef="WaitResult" targetRef="Result"/>
+    <sequenceFlow id="f6" sourceRef="Result" targetRef="Success" name="SUCCEEDED"/>
+    <sequenceFlow id="f7" sourceRef="Success" targetRef="EndSuccess"/>
+    <sequenceFlow id="f8" sourceRef="Result" targetRef="Retry" name="FAILED"/>
+    <sequenceFlow id="f9" sourceRef="Retry" targetRef="ScheduleRetry" name="да"/>
+    <sequenceFlow id="f10" sourceRef="ScheduleRetry" targetRef="EndPending"/>
+    <sequenceFlow id="f11" sourceRef="Retry" targetRef="Failed" name="нет"/>
+    <sequenceFlow id="f12" sourceRef="Failed" targetRef="EndFailed"/>
+  </process>
+</definitions>

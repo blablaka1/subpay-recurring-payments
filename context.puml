@@ -1,0 +1,13 @@
+@startuml
+left to right direction
+actor "Merchant system" as Merchant
+actor "Customer" as Customer
+rectangle "SubPay" as SubPay
+rectangle "PSP" as PSP
+Merchant --> SubPay : subscriptions / status / payments
+Customer --> PSP : tokenization via hosted form/SDK
+PSP --> Customer : payment method token
+Merchant --> SubPay : provider token for customer
+SubPay --> PSP : create payment / get status
+PSP --> SubPay : signed webhook
+@enduml
